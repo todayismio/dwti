@@ -23,6 +23,26 @@ document.querySelector('#shareDialog .close').onclick=()=>document.querySelector
 fetch('roster.json').then(r=>{if(!r.ok)throw new Error();return r.json();}).then(r=>{roster=r.map(role=>({...role,image:role.image+"?v=compact1"}));const m=location.hash.match(/^#(v1|v2)-([0-3]{18})$/);if(m){answerVersion=m[1];activeQuestions=answerVersion==='v1'?LEGACY_QUESTIONS:QUESTIONS;answers=m[2].split('').map(Number);result();}else landing();}).catch(()=>{app.innerHTML='<div class="error"><h1>档案暂时没有送达</h1><p>请检查网络后刷新页面重试。</p><button class="primary" onclick="location.reload()">重新读取</button></div>';});
 
 const statsBase = window.MANOR_STATS_BASE || '';
+const statsFallback = window.MANOR_STATS_FALLBACK || '';
+let preferredStatsBase = statsBase;
+
+async function fetchStats(path, options = {}) {
+  const alternate = preferredStatsBase === statsBase ? statsFallback : statsBase;
+  for (const base of new Set([preferredStatsBase, alternate])) {
+    if (!base) continue;
+    try {
+      const response = await fetch(base + path, {
+        ...options,
+        signal: AbortSignal.timeout(4500),
+      });
+      if (response.ok) {
+        preferredStatsBase = base;
+        return response;
+      }
+    } catch {}
+  }
+  throw new Error('统计接口暂时不可用');
+}
 const pendingPrefix = 'dwti:pending-round:';
 const pendingRounds = new Set();
 let syncingRounds = false;
@@ -49,14 +69,12 @@ async function loadVisitorCount() {
         visitorId ||= crypto.randomUUID();
         try { localStorage.setItem('dwti:visitor', visitorId); } catch {}
       }
-      const response = await fetch(statsBase + '/api/visitor-count', {
+      const response = await fetchStats('/api/visitor-count', {
         method: 'POST',
         keepalive: true,
-        signal: AbortSignal.timeout(8000),
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify({ visitor: visitorId }),
       });
-      if (!response.ok) return;
       const { count } = await response.json();
       if (Number.isSafeInteger(count) && count >= 0) visitorTotal = count;
       display();
@@ -78,11 +96,9 @@ async function loadGenerationCount() {
   }
   const request = ++countRequest;
   try {
-    const response = await fetch(statsBase + '/api/archive-count', {
+    const response = await fetchStats('/api/archive-count', {
       cache: 'no-store',
-      signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) throw new Error();
     const { count } = await response.json();
     if (!Number.isSafeInteger(count) || count < 0) throw new Error();
     if (request !== countRequest) return;
@@ -104,14 +120,12 @@ async function syncPendingRounds() {
       }
     } catch {}
     for (const id of pendingRounds) {
-      const response = await fetch(statsBase + '/api/archive-count', {
+      await fetchStats('/api/archive-count', {
         method: 'POST',
         keepalive: true,
-        signal: AbortSignal.timeout(8000),
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify({ round: id }),
       });
-      if (!response.ok) break;
       pendingRounds.delete(id);
       try { localStorage.removeItem(pendingPrefix + id); } catch {}
       synced = true;
