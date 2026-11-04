@@ -24,17 +24,18 @@ fetch('roster.json').then(r=>{if(!r.ok)throw new Error();return r.json();}).then
 
 const statsBase = window.MANOR_STATS_BASE || '';
 const statsFallback = window.MANOR_STATS_FALLBACK || '';
-let preferredStatsBase = statsBase;
+let preferredStatsBase = statsFallback || statsBase;
 
 async function fetchStats(path, options = {}) {
   const alternate = preferredStatsBase === statsBase ? statsFallback : statsBase;
   for (const base of new Set([preferredStatsBase, alternate])) {
     if (!base) continue;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4500);
+    const timeout = setTimeout(() => controller.abort(), 12000);
     try {
       const response = await fetch(base + path, {
         ...options,
+        credentials: 'omit',
         signal: controller.signal,
       });
       if (response.ok) {
