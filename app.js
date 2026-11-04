@@ -22,14 +22,79 @@ async function saveCard(){const b=document.querySelector('#save');b.disabled=tru
 document.querySelector('#shareDialog .close').onclick=()=>document.querySelector('#shareDialog').close();document.querySelector('#home').onclick=landing;
 fetch('roster.json').then(r=>{if(!r.ok)throw new Error();return r.json();}).then(r=>{roster=r.map(role=>({...role,image:role.image+"?v=compact1"}));const m=location.hash.match(/^#(v1|v2)-([0-3]{18})$/);if(m){answerVersion=m[1];activeQuestions=answerVersion==='v1'?LEGACY_QUESTIONS:QUESTIONS;answers=m[2].split('').map(Number);result();}else landing();}).catch(()=>{app.innerHTML='<div class="error"><h1>档案暂时没有送达</h1><p>请检查网络后刷新页面重试。</p><button class="primary" onclick="location.reload()">重新读取</button></div>';});
 
-const statsBase=window.MANOR_STATS_BASE||'';
-async function loadGenerationCount(){
- const el=document.querySelector('#archive-count');if(!el)return;if(!window.MANOR_STATS_BASE){el.hidden=true;return;}
- try{const r=await fetch(statsBase+'/api/archive-count',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();if(!Number.isSafeInteger(d.count)||d.count<0)throw Error();el.textContent='已生成 '+d.count.toLocaleString('zh-CN')+' 份演绎者档案';}catch{el.textContent='演绎者档案统计暂不可用';}
+const statsBase = window.MANOR_STATS_BASE || '';
+const pendingPrefix = 'dwti:pending-round:';
+const pendingRounds = new Set();
+let syncingRounds = false;
+let countRequest = 0;
+
+async function loadGenerationCount() {
+  const el = document.querySelector('#archive-count');
+  if (!el) return;
+  if (!statsBase) {
+    el.hidden = true;
+    return;
+  }
+  const request = ++countRequest;
+  try {
+    const response = await fetch(statsBase + '/api/archive-count', {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error();
+    const { count } = await response.json();
+    if (!Number.isSafeInteger(count) || count < 0) throw new Error();
+    if (request !== countRequest) return;
+    el.textContent = '已生成 ' + count.toLocaleString('zh-CN') + ' 份演绎者档案';
+  } catch {
+    if (request === countRequest) el.textContent = '档案计数暂时无法读取';
+  }
 }
-async function recordGeneration(){
- if(!window.MANOR_STATS_BASE)return;if(!roundId)return;const id=roundId;roundId=null;
- for(let attempt=0;attempt<2;attempt++){
-  try{const r=await fetch(statsBase+'/api/archive-count',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json'},body:JSON.stringify({round:id})});if(r.ok)return;}catch{}
- }
+
+async function syncPendingRounds() {
+  if (!statsBase || syncingRounds) return;
+  syncingRounds = true;
+  let synced = false;
+  try {
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith(pendingPrefix)) pendingRounds.add(key.slice(pendingPrefix.length));
+      }
+    } catch {}
+    for (const id of pendingRounds) {
+      const response = await fetch(statsBase + '/api/archive-count', {
+        method: 'POST',
+        keepalive: true,
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ round: id }),
+      });
+      if (!response.ok) break;
+      pendingRounds.delete(id);
+      try { localStorage.removeItem(pendingPrefix + id); } catch {}
+      synced = true;
+    }
+  } catch {
+    // Leave unconfirmed rounds queued for the next attempt.
+  } finally {
+    syncingRounds = false;
+    if (synced) void loadGenerationCount();
+  }
 }
+
+function recordGeneration() {
+  if (!statsBase || !roundId) return;
+  const id = roundId;
+  roundId = null;
+  pendingRounds.add(id);
+  try { localStorage.setItem(pendingPrefix + id, '1'); } catch {}
+  void syncPendingRounds();
+}
+
+window.addEventListener('online', syncPendingRounds);
+window.addEventListener('pageshow', syncPendingRounds);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  void loadGenerationCount();
+  void syncPendingRounds();
+});
