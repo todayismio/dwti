@@ -9,7 +9,7 @@ function calculate(input,characters,questionSet=QUESTIONS){
 }
 function goTop(){window.scrollTo({top:0,behavior:'instant'});}
 function creatorFooter(showTip=false){return `<section class="creator-footer"><p class="creator-credit">作者 @Mio酱ovo（dy）<br>欢迎在平台留言，<br>还想玩什么也来告诉我吧～</p>${showTip?`<section class="tip-box" aria-label="支持作者"><p class="tip-title">感谢天使的投币赞助呀嘿嘿～ ♡</p><div class="tip-content"><img src="creator-tip.webp" alt="作者的打赏码" fetchpriority="low" width="260" height="262"><p>自愿支持 · 感谢你的喜欢</p></div></section>`:''}</section>`;}
-function landing(){activeQuestions=QUESTIONS;answerVersion="v2";roundId=null;busy=false;answers=[];current=0;lastResult=null;history.replaceState(null,'',location.pathname);app.innerHTML=`<section class="landing"><img class="landing-logo" src="manor-home.webp" fetchpriority="high" alt="园丁像素图标"><div class="eyebrow">IDENTITY V · PERSONALITY LETTER</div><h1>求生者or监管者<br>测测你的DWTI</h1><p class="lead">53位求生者 · 36位监管者 · 约4-5分钟完成</p><div class="invitation"><p class="note">欢迎来到欧利蒂斯庄园，<br>请解锁你的五格</p></div><button class="primary" id="start">进入庄园 · 建立档案 <span aria-hidden="true">↗</span></button><p class="counter" id="archive-count" role="status">正在读取演绎者档案数量…</p><p class="fine">按第一直觉选择 · 原创庄园情境</p>${creatorFooter()}</section>`;loadGenerationCount();document.querySelector('#start').onclick=()=>{roundId=crypto.randomUUID();answers=[];current=0;question();goTop();};goTop();}
+function landing(){activeQuestions=QUESTIONS;answerVersion="v2";roundId=null;busy=false;answers=[];current=0;lastResult=null;history.replaceState(null,'',location.pathname);app.innerHTML=`<section class="landing"><img class="landing-logo" src="manor-home.webp" fetchpriority="high" alt="园丁像素图标"><div class="eyebrow">IDENTITY V · PERSONALITY LETTER</div><h1>求生者or监管者<br>测测你的DWTI</h1><p class="lead">53位求生者 · 36位监管者 · 约4-5分钟完成</p><div class="invitation"><p class="note">欢迎来到欧利蒂斯庄园，<br>请解锁你的五格</p></div><button class="primary" id="start">进入庄园 · 建立档案 <span aria-hidden="true">↗</span></button><p class="counter" id="archive-count" role="status">正在读取演绎者档案数量…</p><p class="counter" id="visitor-count" hidden></p><p class="fine">按第一直觉选择 · 原创庄园情境</p>${creatorFooter()}</section>`;loadGenerationCount();loadVisitorCount();document.querySelector('#start').onclick=()=>{roundId=crypto.randomUUID();answers=[];current=0;question();goTop();};goTop();}
 function question(){busy=false;const q=activeQuestions[current];app.innerHTML=`<section class="question"><div class="qmeta"><span>庄园来信 · 第${Math.floor(current/6)+1}章</span><span><strong>${String(current+1).padStart(2,'0')}</strong> / 18</span></div><div class="progress" role="progressbar" aria-label="答题进度" aria-valuemin="0" aria-valuemax="18" aria-valuenow="${current}"><i style="width:${current/18*100}%"></i></div><div class="chapter">${esc(q[0])}</div><h1 tabindex="-1">${esc(q[1])}</h1><div class="answers">${q[3].map((t,i)=>`<button class="answer ${answers[current]===i?'selected':''}" data-answer="${i}" aria-pressed="${answers[current]===i}"><span>${letters[i]}</span>${esc(t)}</button>`).join('')}</div><div class="qfoot"><button class="textbtn" id="prev" ${current===0?'disabled':''}>← 上一题</button><span>选中后自动继续 · 答案没有对错</span></div></section>`;document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>{if(busy)return;busy=true;answers[current]=Number(b.dataset.answer);b.classList.add('selected');setTimeout(()=>{if(current<17){current++;question();}else result(true);},160);});document.querySelector('#prev').onclick=()=>{if(busy||!current)return;current--;question();};document.querySelector('h1').focus({preventScroll:true});}
 function evidence(vector,hero){return vector.map((v,i)=>({i,gap:Math.abs(v-hero.vector[i])})).sort((a,b)=>a.gap-b.gap).slice(0,3).map(({i})=>{let chosen=answers.map((a,j)=>({a,j,q:activeQuestions[j]})).filter(x=>x.q[2].includes(i));let ideal=vector[i]>=2?4:0;chosen.sort((a,b)=>{const value=x=>{const a=x.q[4]?x.q[4][x.a]:x.a;return x.q[2][0]===i?(a>=2?4:0):(a%2?4:0);};return Math.abs(value(a)-ideal)-Math.abs(value(b)-ideal);});const ex=chosen[0];return `<li>在「${esc(ex.q[0])}」中，你选择了“${esc(ex.q[3][ex.a])}”${vector[i]===2?'这次选择展现了你对情境的权衡。':`这与你在${DIMS[i][0]}上${vector[i]>2?'偏向「'+DIMS[i][2]+'」':'偏向「'+DIMS[i][1]+'」'}的整体倾向相呼应。`}</li>`;}).join('');}
 function result(record=false){busy=false;lastResult=calculate(answers,roster,activeQuestions);const {vector,ranked}=lastResult;const hero=ranked[0];app.innerHTML=`<article class="dossier"><div class="topline"><span>庄园人格档案 / PERSONAL FILE</span><span>NO. ${String(hero.id+1).padStart(3,'0')}</span></div><section class="result-head"><div class="portrait" data-figure="${String(hero.id+1).padStart(3,'0')}"><span class="stamp">${esc(hero.faction)} · 共鸣档案</span><img src="${esc(hero.image)}" fetchpriority="high" alt="${esc(hero.name)}像素同人形象"></div><p class="sub">身份侧写已归档</p><h1>${esc(hero.name)}</h1><p class="personality-title">${esc(hero.title)}</p><p class="quote">“${esc(hero.quote)}”</p></section><section class="section"><h2>你们的相似内在人格</h2><p class="bio">${esc(hero.inner)}</p><p class="gentle">${esc(hero.bio)}</p><details class="answer-notes"><summary>展开选择留下的线索</summary><ul class="evidence">${evidence(vector,hero)}</ul></details></section><section class="section imprint"><h2>你留在庄园的印记</h2><span class="eyebrow">OBJECT / ABILITY · 角色意象</span><h3 class="symbol">${esc(hero.symbol)}</h3><p class="branch">${esc(hero.branch)}</p><p class="fine">这是一段根据角色意象与人格原型创作的假想支线，不是游戏原剧情。</p><div class="letter-note"><span>离庄前，留给你的一句话</span><p>${reminder(vector)}</p></div></section><section class="section"><h2>庄园行动倾向</h2><div class="bars">${vector.map((v,i)=>`<button class="dim ${i===0?'active':''}" data-dim="${i}" aria-pressed="${i===0}"><strong>${Math.round(v*25)}</strong><small>/ 100</small><div class="track"><div class="fill" style="width:${v*25}%"></div></div><span class="dim-name">${DIMS[i][0]}</span></button>`).join('')}</div><p class="fine">点击维度查看解释 · 数值是两端倾向的位置，没有高低优劣</p><div class="dimdetail" id="dimdetail"></div></section><section class="section"><h2>邀请函的另外两种落款</h2><div class="similar">${ranked.slice(1,3).map(c=>`<div class="similar-card"><img src="${esc(c.image)}" alt="${esc(c.name)}像素同人形象" loading="lazy"><p>${esc(c.faction)}</p><h3>${esc(c.name)}</h3><p>${esc(c.title)}</p><p style="margin-top:10px">${esc(c.bio)}</p></div>`).join('')}</div><p class="fine">同一组选择，也会与这些来客产生交集。阵营不代表性格好坏。</p></section><div class="actions"><button class="primary" id="save">保存档案图片</button><button class="secondary" id="copy">分享给朋友</button></div><p class="sharestatus" id="sharestatus" role="status"></p><div style="text-align:center"><button class="textbtn" id="again">重新拆一封来信</button></div><p class="fine" style="text-align:center;margin-top:25px">称号、代表语与解读均为本测试同人原创</p>${creatorFooter(true)}</article>`;document.querySelectorAll('[data-dim]').forEach(b=>b.onclick=()=>showDimension(Number(b.dataset.dim)));showDimension(0);if(record)recordGeneration();document.querySelector('#again').onclick=landing;document.querySelector('#save').onclick=saveCard;document.querySelector('#copy').onclick=copyLink;goTop();}
@@ -27,6 +27,44 @@ const pendingPrefix = 'dwti:pending-round:';
 const pendingRounds = new Set();
 let syncingRounds = false;
 let countRequest = 0;
+let archiveTotal;
+let visitorId;
+let visitorTotal;
+let visitorRequest;
+
+async function loadVisitorCount() {
+  if (!statsBase) return;
+  const display = () => {
+    const el = document.querySelector('#visitor-count');
+    if (!el || visitorTotal === undefined) return;
+    el.textContent = '累计到访 ' + visitorTotal.toLocaleString('zh-CN') + ' 个浏览器';
+    el.hidden = false;
+  };
+  display();
+  if (visitorRequest) return;
+  visitorRequest = (async () => {
+    try {
+      if (!visitorId) {
+        try { visitorId = localStorage.getItem('dwti:visitor'); } catch {}
+        visitorId ||= crypto.randomUUID();
+        try { localStorage.setItem('dwti:visitor', visitorId); } catch {}
+      }
+      const response = await fetch(statsBase + '/api/visitor-count', {
+        method: 'POST',
+        keepalive: true,
+        signal: AbortSignal.timeout(8000),
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({ visitor: visitorId }),
+      });
+      if (!response.ok) return;
+      const { count } = await response.json();
+      if (Number.isSafeInteger(count) && count >= 0) visitorTotal = count;
+      display();
+    } catch {}
+  })();
+  await visitorRequest;
+  visitorRequest = undefined;
+}
 
 async function loadGenerationCount() {
   const el = document.querySelector('#archive-count');
@@ -34,6 +72,9 @@ async function loadGenerationCount() {
   if (!statsBase) {
     el.hidden = true;
     return;
+  }
+  if (archiveTotal !== undefined) {
+    el.textContent = '已生成 ' + archiveTotal.toLocaleString('zh-CN') + ' 份演绎者档案';
   }
   const request = ++countRequest;
   try {
@@ -45,9 +86,10 @@ async function loadGenerationCount() {
     const { count } = await response.json();
     if (!Number.isSafeInteger(count) || count < 0) throw new Error();
     if (request !== countRequest) return;
+    archiveTotal = count;
     el.textContent = '已生成 ' + count.toLocaleString('zh-CN') + ' 份演绎者档案';
   } catch {
-    if (request === countRequest) el.textContent = '档案计数暂时无法读取';
+    if (request === countRequest && archiveTotal === undefined) el.textContent = '档案计数暂时无法读取';
   }
 }
 
@@ -66,7 +108,7 @@ async function syncPendingRounds() {
         method: 'POST',
         keepalive: true,
         signal: AbortSignal.timeout(8000),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify({ round: id }),
       });
       if (!response.ok) break;
@@ -92,9 +134,19 @@ function recordGeneration() {
 }
 
 window.addEventListener('online', syncPendingRounds);
+window.addEventListener('online', loadVisitorCount);
+void loadVisitorCount();
 window.addEventListener('pageshow', syncPendingRounds);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   void loadGenerationCount();
+  void loadVisitorCount();
   void syncPendingRounds();
 });
+
+if (statsBase) window.setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  void loadGenerationCount();
+  void loadVisitorCount();
+  void syncPendingRounds();
+}, 60000);
