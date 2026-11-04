@@ -1,0 +1,1 @@
+{"name": "测测你的DWTI", "short_name": "DWTI", "start_url": "./", "display": "standalone", "background_color": "#f6f3eb", "theme_color": "#f6f3eb", "icons": [{"src": "manor-512.png", "sizes": "512x512", "type": "image/png"}]}
